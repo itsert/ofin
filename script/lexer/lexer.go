@@ -1,32 +1,34 @@
-package scanner
+package lexer
 
 import (
 	"fmt"
 	"strconv"
 
 	"github.com/itsert/ofin/merror"
-	"github.com/itsert/ofin/token"
+	"github.com/itsert/ofin/script/token"
 )
 
-type Scanner struct {
+type Lexer struct {
 	input   string
 	start   int
 	current int
 	line    int
 	tokens  []token.Token
+	File    string
 }
 
-func NewScanner(input string) *Scanner {
-	scanner := &Scanner{
+func NewLexer(input string, fileName string) *Lexer {
+	lexer := &Lexer{
 		line:    1,
 		start:   0,
 		current: 0,
 		input:   input,
+		File:    fileName,
 	}
-	return scanner
+	return lexer
 }
 
-func (s *Scanner) Tokenize() []token.Token {
+func (s *Lexer) Tokenize() []token.Token {
 	for !s.end() {
 		s.start = s.current
 		s.munchToken()
@@ -41,7 +43,7 @@ func (s *Scanner) Tokenize() []token.Token {
 	return s.tokens
 }
 
-func (s *Scanner) addToken(tokenType token.TokenType, literal interface{}) {
+func (s *Lexer) addToken(tokenType token.TokenType, literal interface{}) {
 	text := s.input[s.start:s.current]
 	s.tokens = append(s.tokens, token.Token{
 		Type:    tokenType,
@@ -51,27 +53,27 @@ func (s *Scanner) addToken(tokenType token.TokenType, literal interface{}) {
 	})
 }
 
-func (s *Scanner) advance() byte {
+func (s *Lexer) advance() byte {
 	current := s.input[s.current]
 	s.current += 1
 	return current
 }
 
-func (s *Scanner) peek() byte {
+func (s *Lexer) peek() byte {
 	if s.end() {
 		return 0
 	}
 	return s.input[s.current]
 }
 
-func (s *Scanner) peekNext() byte {
+func (s *Lexer) peekNext() byte {
 	if s.current+1 >= len(s.input) {
 		return 0
 	}
 	return s.input[s.current+1]
 }
 
-func (s *Scanner) munchToken() {
+func (s *Lexer) munchToken() {
 	ch := s.advance()
 	switch ch {
 	case '(':
@@ -137,22 +139,29 @@ func (s *Scanner) munchToken() {
 		}
 	case '\n':
 		s.line += 1
+		if len(s.tokens) > 0 && s.lastToken().Type != token.NEWLINE {
+			s.addToken(token.NEWLINE, nil)
+		}
 	case ' ', '\t', '\r':
 		break
 	case '"':
-		s.munchString()
+		s.eatString()
 	default:
 		if isDigit(ch) {
-			s.munchNumbers()
+			s.eatNumbers()
 		} else if isLetter(ch) {
-			s.munchIdentifier()
+			s.eatIdentifier()
 		} else {
-			merror.Error("test.file", s.line, s.start, "Unexpected character.")
+			merror.Error(s.File, s.line, s.start, "Unexpected character.")
 		}
 	}
 }
 
-func (s *Scanner) munchIdentifier() {
+func (s *Lexer) lastToken() token.Token {
+	return s.tokens[len(s.tokens)-1]
+}
+
+func (s *Lexer) eatIdentifier() {
 	for isAlphaNumeric(s.peek()) {
 		s.advance()
 	}
@@ -172,7 +181,7 @@ func isLetter(ch byte) bool {
 	return 'a' <= ch && ch <= 'z' || 'A' <= ch && ch <= 'Z' || ch == '_'
 }
 
-func (s *Scanner) munchNumbers() {
+func (s *Lexer) eatNumbers() {
 	for isDigit(s.peek()) {
 		s.advance()
 	}
@@ -182,7 +191,7 @@ func (s *Scanner) munchNumbers() {
 			s.advance()
 		}
 	}
-	if f, err := strconv.ParseFloat(s.input[s.start:s.current], 32); err == nil {
+	if f, err := strconv.ParseFloat(s.input[s.start:s.current], 64); err == nil {
 		s.addToken(token.NUMBER, f)
 	} else {
 		msg := fmt.Sprintf("Error parsing value %s", s.input[s.start:s.current])
@@ -190,16 +199,16 @@ func (s *Scanner) munchNumbers() {
 	}
 }
 
-func (s *Scanner) munchString() {
+func (s *Lexer) eatString() {
 	for s.peek() != '"' && !s.end() {
 		if s.peek() == '\n' {
-			merror.Error("test.of", s.line, s.start, "String did not terminate before encountering newline")
+			merror.Error(s.File, s.line, s.start, "String did not terminate before encountering newline")
 		}
 		s.advance()
 	}
 
 	if s.end() {
-		merror.Error("test.of", s.line, s.start, "String does not terminate")
+		merror.Error(s.File, s.line, s.start, "String does not terminate")
 		return
 	}
 	s.advance()
@@ -208,7 +217,7 @@ func (s *Scanner) munchString() {
 	s.addToken(token.STRING, str)
 }
 
-func (s *Scanner) match(expected byte) bool {
+func (s *Lexer) match(expected byte) bool {
 	if s.end() {
 		return false
 	}
@@ -220,6 +229,6 @@ func (s *Scanner) match(expected byte) bool {
 	return true
 }
 
-func (s *Scanner) end() bool {
+func (s *Lexer) end() bool {
 	return s.current >= len(s.input)
 }

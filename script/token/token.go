@@ -9,6 +9,20 @@ type Token struct {
 	Line    int
 }
 
+func NewToken(
+	Type TokenType,
+	Lexeme string,
+	Literal interface{},
+	Line int,
+) *Token {
+	return &Token{
+		Type:    Type,
+		Lexeme:  Lexeme,
+		Literal: Literal,
+		Line:    Line,
+	}
+}
+
 const (
 	ILLEGAL = ""
 	EOF     = "EOF"
@@ -31,7 +45,8 @@ const (
 	BANG_EQUAL    = "!="
 	// Delimiters
 	COMMA       = ","
-	SEMICOLON   = ","
+	SEMICOLON   = ";"
+	NEWLINE     = "NEWLINE"
 	LEFT_PAREN  = "("
 	RIGHT_PAREN = ")"
 	LEFT_BRACE  = "{"
@@ -42,25 +57,26 @@ const (
 	// Keywords
 	// 1343456
 	FUNCTION = "FUNCTION"
-	LET      = "LET"
 	TRUE     = "TRUE"
 	FALSE    = "FALSE"
 	IF       = "IF"
 	ELSE     = "ELSE"
 	RETURN   = "RETURN"
 	WHILE    = "WHILE"
+	FOR      = "FOR"
 	WHEN     = "WHEN"
 	SCENARIO = "SCENARIO"
 	THEN     = "THEN"
 	GIVEN    = "GIVEN"
 	STORY    = "STORY"
+	STRING   = "STRING"
 
-	STRING = "STRING"
+	//FUNCTIONS
+	PRINT = "PRINT"
 )
 
 var keywords = map[string]TokenType{
 	"fn":     FUNCTION,
-	"let":    LET,
 	"true":   TRUE,
 	"false":  FALSE,
 	"if":     IF,
