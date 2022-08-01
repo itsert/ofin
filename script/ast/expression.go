@@ -1,89 +1,121 @@
 package ast
 
 import "github.com/itsert/ofin/script/token"
+
 type Expression interface {
 	Expression()
-	Accept(visitor Visitor) interface{}
+	Accept(visitor ExpressionVisitor) interface{}
+}
+
+type Assign struct {
+	Name token.Token
+	Expr Expression
+}
+
+func NewAssign(Name token.Token, Expr Expression) *Assign {
+	return &Assign{
+		Name: Name,
+		Expr: Expr,
+	}
+}
+
+func (a *Assign) Expression() {}
+
+func (a *Assign) Accept(visitor ExpressionVisitor) interface{} {
+	return visitor.VisitAssignExpression(a)
 }
 
 type Binary struct {
-	Left Expression
+	Left     Expression
 	Operator token.Token
-	Right Expression
+	Right    Expression
 }
 
-func NewBinary(Left Expression, Operator token.Token, Right Expression) *Binary{
+func NewBinary(Left Expression, Operator token.Token, Right Expression) *Binary {
 	return &Binary{
-		Left:	Left,
-		Operator:	Operator,
-		Right:	Right,
+		Left:     Left,
+		Operator: Operator,
+		Right:    Right,
 	}
 }
 
 func (b *Binary) Expression() {}
 
-func (b *Binary) Accept(visitor Visitor) interface{} {
-	 return visitor.VisitBinaryExpression(b)
+func (b *Binary) Accept(visitor ExpressionVisitor) interface{} {
+	return visitor.VisitBinaryExpression(b)
 }
-
 
 type Grouping struct {
 	Expr Expression
 }
 
-func NewGrouping(Expr Expression) *Grouping{
+func NewGrouping(Expr Expression) *Grouping {
 	return &Grouping{
-		Expr:	Expr,
+		Expr: Expr,
 	}
 }
 
 func (g *Grouping) Expression() {}
 
-func (g *Grouping) Accept(visitor Visitor) interface{} {
-	 return visitor.VisitGroupingExpression(g)
+func (g *Grouping) Accept(visitor ExpressionVisitor) interface{} {
+	return visitor.VisitGroupingExpression(g)
 }
-
 
 type Literal struct {
 	Value interface{}
 }
 
-func NewLiteral(Value interface{}) *Literal{
+func NewLiteral(Value interface{}) *Literal {
 	return &Literal{
-		Value:	Value,
+		Value: Value,
 	}
 }
 
 func (l *Literal) Expression() {}
 
-func (l *Literal) Accept(visitor Visitor) interface{} {
-	 return visitor.VisitLiteralExpression(l)
+func (l *Literal) Accept(visitor ExpressionVisitor) interface{} {
+	return visitor.VisitLiteralExpression(l)
 }
-
 
 type Unary struct {
 	Operator token.Token
-	Right Expression
+	Right    Expression
 }
 
-func NewUnary(Operator token.Token, Right Expression) *Unary{
+func NewUnary(Operator token.Token, Right Expression) *Unary {
 	return &Unary{
-		Operator:	Operator,
-		Right:	Right,
+		Operator: Operator,
+		Right:    Right,
 	}
 }
 
 func (u *Unary) Expression() {}
 
-func (u *Unary) Accept(visitor Visitor) interface{} {
-	 return visitor.VisitUnaryExpression(u)
+func (u *Unary) Accept(visitor ExpressionVisitor) interface{} {
+	return visitor.VisitUnaryExpression(u)
 }
 
+type Variable struct {
+	Name token.Token
+}
 
-type Visitor interface {
+func NewVariable(Name token.Token) *Variable {
+	return &Variable{
+		Name: Name,
+	}
+}
+
+func (v *Variable) Expression() {}
+
+func (v *Variable) Accept(visitor ExpressionVisitor) interface{} {
+	return visitor.VisitVariableExpression(v)
+}
+
+type ExpressionVisitor interface {
+	VisitAssignExpression(expression *Assign) interface{}
 	VisitBinaryExpression(expression *Binary) interface{}
 	VisitGroupingExpression(expression *Grouping) interface{}
 	VisitLiteralExpression(expression *Literal) interface{}
 	VisitUnaryExpression(expression *Unary) interface{}
+	VisitVariableExpression(expression *Variable) interface{}
 }
-

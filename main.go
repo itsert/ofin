@@ -18,28 +18,37 @@ func main() {
 			os.Exit(1)
 		}
 		tools.GenerateAST(os.Args[2], "Expression", []string{
+			"Assign   : Name token.Token, Expr Value",
 			"Binary : Left Expression, Operator token.Token, Right Expression",
 			"Grouping : Expr Expression",
 			"Literal : Value interface{}",
 			"Unary : Operator token.Token, Right Expression",
+			"Variable : Name token.Token",
 		})
-		// tools.GenerateAST(os.Args[2], "Statement", []string{
-		// 	"StmtExpression : Expr Expression",
-		// 	"Print : Expr Expression",
-		// })
+		tools.GenerateAST(os.Args[2], "Statement", []string{
+			"StmtExpression : Expr Expression",
+			"Print : Expr Expression",
+			"Var : Name token.Token, Initializer Expression",
+		})
 	} else if action == "pretty" {
 		input := `
-		1 + 2 * (3 + 4)
+		print 1 + 2 * (3 + 4) 
+		print 4
+		print true
+		print 2 + 1
+		given a = 31 + 78
+		a = 23
+		print a
 		`
 		l := lexer.NewLexer(input, "main.go")
 
-		expression, err := parser.NewParser(l).ParseProgram()
+		stmnts, err := parser.NewParser(l).ParseProgram()
 		if err != nil {
 			return
 		}
 
-		fmt.Println(interpreter.NewPrettyPrinter().Print(expression))
-		fmt.Printf("%+v\n", interpreter.NewInterpreter().Interpret(expression))
+		// fmt.Println(interpreter.NewPrettyPrinter().Print(expression))
+		interpreter.NewInterpreter().Interpret(stmnts)
 
 	} else {
 		input := `=+(){},;`

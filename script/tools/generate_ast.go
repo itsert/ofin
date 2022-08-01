@@ -29,7 +29,7 @@ func GenerateAST(outputDir string, fileName string, types []string) {
 	baseType := fileName
 	f.WriteString(fmt.Sprintf("type %s interface {\n", baseType))
 	f.WriteString(fmt.Sprintf("\t%s()\n", baseType))
-	f.WriteString("\tAccept(visitor Visitor) interface{}\n")
+	f.WriteString(fmt.Sprintf("\tAccept(visitor %sVisitor) interface{}\n", baseType))
 	f.WriteString("}\n\n")
 
 	for _, t := range types {
@@ -62,16 +62,17 @@ func defineType(f *os.File, baseName string, structName string, filedList string
 
 	f.WriteString(
 		fmt.Sprintf(
-			"func (%s *%s) Accept(visitor Visitor) interface{} {\n\t return visitor.Visit%s%s(%s)\n}\n\n\n",
+			"func (%s *%s) Accept(visitor %sVisitor) interface{} {\n\t return visitor.Visit%s%s(%s)\n}\n\n\n",
 			strings.ToLower(string(structName[0])),
 			structName,
+			baseName,
 			structName,
 			baseName,
 			strings.ToLower(string(structName[0]))))
 }
 
 func defineVisitor(f *os.File, baseName string, types []string) {
-	f.WriteString("type Visitor interface {\n")
+	f.WriteString(fmt.Sprintf("type %sVisitor interface {\n", baseName))
 	for _, t := range types {
 		structName := strings.TrimSpace(strings.Split(t, ":")[0])
 		f.WriteString(fmt.Sprintf("\tVisit%s%s(%s *%s) interface{}\n", structName, baseName, strings.ToLower(baseName), structName))

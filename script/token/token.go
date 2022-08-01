@@ -87,6 +87,7 @@ var keywords = map[string]TokenType{
 	"and":    AND,
 	"given":  GIVEN,
 	"story":  STORY,
+	"print":  PRINT,
 }
 
 func LookupIdentifier(ident string) TokenType {

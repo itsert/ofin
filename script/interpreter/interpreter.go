@@ -1,20 +1,32 @@
 package interpreter
 
 import (
+	"fmt"
+
 	"github.com/itsert/ofin/merror"
 	"github.com/itsert/ofin/script/ast"
+	"github.com/itsert/ofin/script/environment"
 	"github.com/itsert/ofin/script/token"
 )
 
 type interpreter struct {
-}
-
-func (p *interpreter) Interpret(expr ast.Expression) interface{} {
-	return p.evaluate(expr)
+	environment *environment.Environment
 }
 
 func NewInterpreter() *interpreter {
-	return &interpreter{}
+	return &interpreter{
+		environment: environment.NewEnvironment(),
+	}
+}
+
+func (p *interpreter) Interpret(stmts []ast.Statement) {
+	for _, stmt := range stmts {
+		p.execute(stmt)
+	}
+}
+
+func (p *interpreter) execute(stmt ast.Statement) {
+	stmt.Accept(p)
 }
 
 func (p *interpreter) VisitBinaryExpression(expr *ast.Binary) interface{} {
@@ -106,6 +118,36 @@ func (p *interpreter) VisitUnaryExpression(expr *ast.Unary) interface{} {
 		}
 		return true
 	}
+	return nil
+}
+
+func (p *interpreter) VisitVariableExpression(expression *ast.Variable) interface{} {
+	v, _ := p.environment.Get(expression.Name)
+	return v
+}
+
+func (p *interpreter) VisitAssignExpression(expression *ast.Assign) interface{} {
+	value := p.evaluate(expression.Expr)
+	p.environment.Assign(expression.Name, value)
+	return value
+}
+
+func (p *interpreter) VisitStmtExpressionStatement(statement *ast.StmtExpression) interface{} {
+	p.evaluate(statement.Expr)
+	return nil
+}
+func (p *interpreter) VisitPrintStatement(statement *ast.Print) interface{} {
+	value := p.evaluate(statement.Expr)
+	fmt.Printf("%+v\n", value)
+	return nil
+}
+
+func (p *interpreter) VisitVarStatement(statement *ast.Var) interface{} {
+	var value interface{} = nil
+	if statement.Initializer != nil {
+		value = p.evaluate(statement.Initializer)
+	}
+	p.environment.Define(statement.Name.Lexeme, value)
 	return nil
 }
 

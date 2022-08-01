@@ -22,18 +22,81 @@ func NewParser(l *lexer.Lexer) *Parser {
 	return p
 }
 
-func (p *Parser) ParseProgram() (expr ast.Expression, err error) {
+func (p *Parser) ParseProgram() (stmnts []ast.Statement, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = errors.New("error  encountered")
 			fmt.Println("Recovered in f", r)
 		}
 	}()
-	return p.expression(), err
+	var statements []ast.Statement
+	for !p.end() {
+		decl, _ := p.declaration()
+		statements = append(statements, decl)
+	}
+	return statements, err
+}
+
+func (p *Parser) declaration() (stmnt ast.Statement, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = errors.New("error  encountered")
+			fmt.Println("Recovered in f", r)
+			p.synchronize()
+		}
+	}()
+	if p.lookAhead(token.GIVEN) {
+		return p.varDeclaration(), err
+	}
+	return p.statement(), err
+}
+
+func (p *Parser) varDeclaration() ast.Statement {
+	name := p.consume("Expecting a variable name", token.IDENTIFIER)
+
+	var initializer ast.Expression = nil
+	if p.lookAhead(token.ASSIGN) {
+		initializer = p.expression()
+	}
+	p.consume("", token.NEWLINE, token.EOF)
+	return ast.NewVar(name, initializer)
+}
+
+func (p *Parser) statement() ast.Statement {
+	if p.lookAhead(token.PRINT) {
+		return p.printStatement()
+	}
+	return p.expressionStatement()
+}
+func (p *Parser) printStatement() ast.Statement {
+	value := p.expression()
+	p.consume("Expect NEWLINE after value", token.NEWLINE, token.EOF)
+	return ast.NewPrint(value)
+}
+
+func (p *Parser) expressionStatement() ast.Statement {
+	value := p.expression()
+	p.consume("Expect NEWLINE after value", token.NEWLINE, token.EOF)
+	return ast.NewStmtExpression(value)
 }
 
 func (p *Parser) expression() ast.Expression {
-	return p.equality()
+	return p.assignment()
+}
+
+func (p *Parser) assignment() ast.Expression {
+	expr := p.equality()
+
+	if p.lookAhead(token.ASSIGN) {
+		equals := p.previous()
+		value := p.assignment()
+		if field, ok := expr.(*ast.Variable); ok {
+			name := field.Name
+			return ast.NewAssign(name, value)
+		}
+		merror.RuntimeError(equals, "Invalid assignment target")
+	}
+	return expr
 }
 
 func (p *Parser) equality() ast.Expression {
@@ -105,18 +168,24 @@ func (p *Parser) primary() ast.Expression {
 		return ast.NewLiteral(p.previous().Literal)
 	}
 
+	if p.lookAhead(token.IDENTIFIER) {
+		return ast.NewVariable(p.previous())
+	}
+
 	if p.lookAhead(token.LEFT_PAREN) {
 		expr := p.expression()
-		p.consume(token.RIGHT_PAREN, "Expect ')' after expression")
+		p.consume("Expect ')' after expression", token.RIGHT_PAREN)
 		return ast.NewGrouping(expr)
 	}
-	merror.Error(p.fileName, p.peek().Line, p.peek().Line, "Expec expression")
+	merror.Error(p.fileName, p.peek().Line, p.peek().Line, "Expected expression")
 	return nil
 }
 
-func (p *Parser) consume(t token.TokenType, message string) token.Token {
-	if p.check(t) {
-		return p.advance()
+func (p *Parser) consume(message string, types ...token.TokenType) token.Token {
+	for _, t := range types {
+		if p.check(t) {
+			return p.advance()
+		}
 	}
 	merror.Error(p.fileName, p.peek().Line, p.peek().Line, "Expecting an expression")
 	return token.Token{}
