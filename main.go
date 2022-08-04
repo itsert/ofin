@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/itsert/ofin/script/interpreter"
 	"github.com/itsert/ofin/script/lexer"
 	"github.com/itsert/ofin/script/parser"
 	"github.com/itsert/ofin/script/tools"
@@ -18,7 +17,7 @@ func main() {
 			os.Exit(1)
 		}
 		tools.GenerateAST(os.Args[2], "Expression", []string{
-			"Assign   : Name token.Token, Expr Value",
+			"Assign   : Name token.Token, Expr Expression",
 			"Binary : Left Expression, Operator token.Token, Right Expression",
 			"Grouping : Expr Expression",
 			"Literal : Value interface{}",
@@ -28,27 +27,48 @@ func main() {
 		tools.GenerateAST(os.Args[2], "Statement", []string{
 			"StmtExpression : Expr Expression",
 			"Print : Expr Expression",
+			"When : Expr Expression",
+			"Then : Expr Expression",
+			"And : Expr Expression",
 			"Var : Name token.Token, Initializer Expression",
+			"Block : statements []Statement",
 		})
 	} else if action == "pretty" {
-		input := `
-		print 1 + 2 * (3 + 4) 
-		print 4
-		print true
-		print 2 + 1
-		given a = 31 + 78
-		a = 23
-		print a
-		`
-		l := lexer.NewLexer(input, "main.go")
+		// 		input := `
+		// print 1 + 2 * (3 + 4)
+		// print 4
+		// print true
+		// print 2 + 1
+		// //And 1 + 2
+		// //Given a = 31 + 78
+		// //And b = "hello"
+		// //print b
+		// //a = 23
+		// //print a
+		// //print b
+		// Then 1 + 2
+		// 		`
+		// 		input = `
+		// Scenario:
+		//    Given a = 31 + 2
+		//    And b = "hello"
+		//    When:
+		//       a = 23
+		// 	  print a
+		//       print 3
+		// `
+		dat, err := os.ReadFile("test.ac")
+		_ = err
+		l := lexer.NewLexer(string(dat), "main.go")
 
 		stmnts, err := parser.NewParser(l).ParseProgram()
 		if err != nil {
 			return
 		}
 
-		// fmt.Println(interpreter.NewPrettyPrinter().Print(expression))
-		interpreter.NewInterpreter().Interpret(stmnts)
+		fmt.Printf("Lexer %+v\n", l)
+		// interpreter.NewInterpreter().Interpret(stmnts)
+		_ = stmnts
 
 	} else {
 		input := `=+(){},;`

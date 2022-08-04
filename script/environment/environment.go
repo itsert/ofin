@@ -31,6 +31,6 @@ func (e *Environment) Get(name token.Token) (interface{}, error) {
 	if v, ok := e.Global[name.Lexeme]; ok {
 		return v, nil
 	}
-	merror.RuntimeError(name, fmt.Sprintf("Variable %s is undefined.", name.Lexeme))
-	return nil, fmt.Errorf("Variable %s is undefined.\n", name.Lexeme)
+	// merror.RuntimeError(name, fmt.Sprintf("Variable %s is undefined.", name.Lexeme))
+	return nil, fmt.Errorf("variable %s is undefined", name.Lexeme)
 }

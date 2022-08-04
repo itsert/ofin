@@ -43,6 +43,9 @@ const (
 	GREATER_EQUAL = ">="
 	EQUAL         = "=="
 	BANG_EQUAL    = "!="
+	COLON         = ":"
+	INDENT        = "INDENT"
+	DEDENT        = "DEDENT"
 	// Delimiters
 	COMMA       = ","
 	SEMICOLON   = ";"
@@ -76,18 +79,19 @@ const (
 )
 
 var keywords = map[string]TokenType{
-	"fn":     FUNCTION,
-	"true":   TRUE,
-	"false":  FALSE,
-	"if":     IF,
-	"else":   ELSE,
-	"return": RETURN,
-	"when":   WHEN,
-	"then":   THEN,
-	"and":    AND,
-	"given":  GIVEN,
-	"story":  STORY,
-	"print":  PRINT,
+	"fn":       FUNCTION,
+	"true":     TRUE,
+	"false":    FALSE,
+	"if":       IF,
+	"else":     ELSE,
+	"return":   RETURN,
+	"When":     WHEN,
+	"Then":     THEN,
+	"And":      AND,
+	"Given":    GIVEN,
+	"Story":    STORY,
+	"print":    PRINT,
+	"Scenario": SCENARIO,
 }
 
 func LookupIdentifier(ident string) TokenType {

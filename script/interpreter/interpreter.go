@@ -10,16 +10,24 @@ import (
 )
 
 type interpreter struct {
-	environment *environment.Environment
+	environment  *environment.Environment
+	programState *environment.ProgramState
 }
 
 func NewInterpreter() *interpreter {
 	return &interpreter{
-		environment: environment.NewEnvironment(),
+		environment:  environment.NewEnvironment(),
+		programState: environment.NewState(),
 	}
 }
 
 func (p *interpreter) Interpret(stmts []ast.Statement) {
+	defer func() {
+		if r := recover(); r != nil {
+			// err = errors.New("error  encountered")
+			fmt.Println("Recovered in f", r)
+		}
+	}()
 	for _, stmt := range stmts {
 		p.execute(stmt)
 	}
@@ -122,7 +130,10 @@ func (p *interpreter) VisitUnaryExpression(expr *ast.Unary) interface{} {
 }
 
 func (p *interpreter) VisitVariableExpression(expression *ast.Variable) interface{} {
-	v, _ := p.environment.Get(expression.Name)
+	v, err := p.environment.Get(expression.Name)
+	if err != nil {
+		merror.RuntimeError(expression.Name, err.Error())
+	}
 	return v
 }
 
@@ -148,6 +159,46 @@ func (p *interpreter) VisitVarStatement(statement *ast.Var) interface{} {
 		value = p.evaluate(statement.Initializer)
 	}
 	p.environment.Define(statement.Name.Lexeme, value)
+	_, err := p.programState.Transition(environment.GIVEN)
+	_ = err
+	return nil
+}
+
+func (p *interpreter) VisitWhenStatement(statement *ast.When) interface{} {
+	p.executeWhen(statement)
+	_, err := p.programState.Transition(environment.WHEN)
+	_ = err
+	return nil
+}
+
+func (p *interpreter) executeWhen(statement *ast.When) {
+	value := p.evaluate(statement.Expr)
+	fmt.Printf("%+v\n", value)
+}
+func (p *interpreter) VisitThenStatement(statement *ast.Then) interface{} {
+	p.executeThen(statement)
+	_, err := p.programState.Transition(environment.THEN)
+	_ = err
+	return nil
+}
+
+func (p *interpreter) executeThen(statement *ast.Then) {
+	value := p.evaluate(statement.Expr)
+	fmt.Printf("%+v\n", value)
+}
+
+func (p *interpreter) VisitAndStatement(statement *ast.And) interface{} {
+	if p.programState.IsState(environment.WHEN) {
+		p.executeWhen(&ast.When{Expr: statement.Expr})
+	} else if p.programState.IsState(environment.THEN) {
+		p.executeThen(&ast.Then{Expr: statement.Expr})
+	} else {
+		fmt.Printf("AND: Program in invalid State:%+v\n", p.programState)
+	}
+	return nil
+}
+
+func (p *interpreter) VisitBlockStatement(statement *ast.Block) interface{} {
 	return nil
 }
 

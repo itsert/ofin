@@ -1,0 +1,18 @@
+//Scenario "In the spirit of a Scenario":
+//    Given a = 31 + 2
+//    And b = "hello"
+//    When "Something happened":
+//        a = 23
+//        print a
+//        b = a
+//        print a
+//    Then "The nothing":
+//        print a
+//        print b
+Scenario:
+   Given a = 31 + 2
+   And b = "hello"
+   When:
+      a = 23
+      print a
+      print 3

@@ -6,24 +6,30 @@ import (
 
 	"github.com/itsert/ofin/merror"
 	"github.com/itsert/ofin/script/token"
+	"github.com/itsert/ofin/util/stack"
 )
 
+const COMMENT_MARKER = '/'
+
 type Lexer struct {
-	input   string
-	start   int
-	current int
-	line    int
-	tokens  []token.Token
-	File    string
+	input             string
+	start             int
+	current           int
+	line              int
+	tokens            []token.Token
+	File              string
+	indentTokenLength int
+	indentTokenStack  stack.Stack
 }
 
 func NewLexer(input string, fileName string) *Lexer {
 	lexer := &Lexer{
-		line:    1,
-		start:   0,
-		current: 0,
-		input:   input,
-		File:    fileName,
+		line:             1,
+		start:            0,
+		current:          0,
+		input:            input,
+		File:             fileName,
+		indentTokenStack: *stack.NewStack([]stack.Item{0}),
 	}
 	return lexer
 }
@@ -66,6 +72,10 @@ func (s *Lexer) peek() byte {
 	return s.input[s.current]
 }
 
+func (s *Lexer) peekPrevious() byte {
+	return s.input[s.current-1]
+}
+
 func (s *Lexer) peekNext() byte {
 	if s.current+1 >= len(s.input) {
 		return 0
@@ -94,6 +104,8 @@ func (s *Lexer) munchToken() {
 		s.addToken(token.PLUS, nil)
 	case ';':
 		s.addToken(token.SEMICOLON, nil)
+	case ':':
+		s.addToken(token.COLON, nil)
 	case '*':
 		s.addToken(token.ASTERISK, nil)
 	case '!':
@@ -137,12 +149,64 @@ func (s *Lexer) munchToken() {
 		} else {
 			s.addToken(token.SLASH, nil)
 		}
-	case '\n':
+	case '\n', '\r':
 		s.line += 1
+		var previousToken token.Token
+		if len(s.tokens) > 0 {
+			previousToken = s.lastToken()
+		}
 		if len(s.tokens) > 0 && s.lastToken().Type != token.NEWLINE {
 			s.addToken(token.NEWLINE, nil)
 		}
-	case ' ', '\t', '\r':
+		if s.peekNext() == COMMENT_MARKER || s.peekNext() == '\n' || s.peekNext() == '\r' {
+			break
+		}
+		if s.peekNext() == ' ' || s.peekNext() == '\t' {
+			count := s.eatWhiteSpaces()
+			if count > s.indentTokenStack.Peek().(int) {
+				if s.indentTokenLength == 0 {
+					s.indentTokenLength = count
+				}
+				if s.indentTokenStack.Size() > 1 {
+					nextCount := s.indentTokenStack.Peek().(int) * s.indentTokenStack.Size()
+					if nextCount != count {
+						merror.Error(s.File, s.line, s.start, "inconsistent indentation detected")
+						return
+					}
+				} else {
+					nextCount := s.indentTokenLength
+
+					if nextCount != count {
+						merror.Error(s.File, s.line, s.start, "inconsistent indentation detected:")
+						return
+					}
+				}
+				s.indentTokenStack.Push(count)
+				s.addToken(token.INDENT, nil)
+			} else if count < s.indentTokenStack.Peek().(int) {
+				for count < s.indentTokenStack.Peek().(int) {
+					nextCount := count * (s.indentTokenStack.Size() - 1)
+					if nextCount != s.indentTokenStack.Peek().(int) {
+						merror.Error(s.File, s.line, s.start, "inconsistent indentation detected:")
+						return
+					}
+					s.addToken(token.DEDENT, nil)
+					if s.indentTokenStack.Size() > 1 {
+						s.indentTokenStack.Pop()
+					}
+				}
+
+			}
+		} else if previousToken.Type == token.COLON {
+			merror.Error(s.File, s.line, s.start, "expecting an indentation block")
+			return
+		} else {
+			for s.indentTokenStack.Size() > 1 {
+				s.addToken(token.DEDENT, nil)
+				s.indentTokenStack.Pop()
+			}
+		}
+	case ' ', '\t':
 		break
 	case '"':
 		s.eatString()
@@ -152,9 +216,10 @@ func (s *Lexer) munchToken() {
 		} else if isLetter(ch) {
 			s.eatIdentifier()
 		} else {
-			merror.Error(s.File, s.line, s.start, "Unexpected character.")
+			merror.Error(s.File, s.line, s.start, "unexpected character.")
 		}
 	}
+
 }
 
 func (s *Lexer) lastToken() token.Token {
@@ -167,6 +232,15 @@ func (s *Lexer) eatIdentifier() {
 	}
 	currentType := token.LookupIdentifier(s.input[s.start:s.current])
 	s.addToken(currentType, nil)
+}
+
+func (s *Lexer) eatWhiteSpaces() int {
+	var count int
+	for s.peek() == ' ' || s.peek() == '\t' {
+		s.advance()
+		count++
+	}
+	return count
 }
 
 func isAlphaNumeric(c byte) bool {

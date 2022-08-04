@@ -6,19 +6,21 @@ import (
 
 	"github.com/itsert/ofin/merror"
 	"github.com/itsert/ofin/script/ast"
+	"github.com/itsert/ofin/script/environment"
 	"github.com/itsert/ofin/script/lexer"
 	"github.com/itsert/ofin/script/token"
 )
 
 type Parser struct {
-	l        *lexer.Lexer
-	tokens   []token.Token
-	current  int
-	fileName string
+	l            *lexer.Lexer
+	tokens       []token.Token
+	current      int
+	fileName     string
+	programState *environment.ProgramState
 }
 
 func NewParser(l *lexer.Lexer) *Parser {
-	p := &Parser{l: l, current: 0, tokens: l.Tokenize(), fileName: l.File}
+	p := &Parser{l: l, current: 0, tokens: l.Tokenize(), fileName: l.File, programState: environment.NewState()}
 	return p
 }
 
@@ -45,7 +47,16 @@ func (p *Parser) declaration() (stmnt ast.Statement, err error) {
 			p.synchronize()
 		}
 	}()
-	if p.lookAhead(token.GIVEN) {
+	if p.lookAhead(token.GIVEN, token.AND) {
+		if p.checkPrevious(token.GIVEN) {
+			_, err = p.programState.Transition(environment.GIVEN)
+			fmt.Printf("Error: %+v\n", err)
+		}
+		if p.checkPrevious(token.AND) {
+			if p.programState.NotState(environment.GIVEN) {
+				fmt.Println("And encountered an invalid state")
+			}
+		}
 		return p.varDeclaration(), err
 	}
 	return p.statement(), err
@@ -66,12 +77,42 @@ func (p *Parser) statement() ast.Statement {
 	if p.lookAhead(token.PRINT) {
 		return p.printStatement()
 	}
+	if p.lookAhead(token.WHEN) {
+		return p.whenStatement()
+	}
+
+	if p.lookAhead(token.THEN) {
+		return p.thenStatement()
+	}
 	return p.expressionStatement()
 }
+
 func (p *Parser) printStatement() ast.Statement {
 	value := p.expression()
 	p.consume("Expect NEWLINE after value", token.NEWLINE, token.EOF)
 	return ast.NewPrint(value)
+}
+
+func (p *Parser) whenStatement() ast.Statement {
+	if p.lookAhead(token.COLON, token.INDENT) {
+		fmt.Println("Inside When statement")
+		return nil
+	} else {
+		value := p.expression()
+		p.consume("Expect NEWLINE after value", token.NEWLINE, token.EOF)
+		return ast.NewWhen(value)
+	}
+}
+
+func (p *Parser) thenStatement() ast.Statement {
+	if p.lookAhead(token.COLON, token.INDENT) {
+		fmt.Println("Inside Then statement")
+		return nil
+	} else {
+		value := p.expression()
+		p.consume("Expect NEWLINE after value", token.NEWLINE, token.EOF)
+		return ast.NewThen(value)
+	}
 }
 
 func (p *Parser) expressionStatement() ast.Statement {
@@ -221,6 +262,10 @@ func (p *Parser) check(t token.TokenType) bool {
 		return false
 	}
 	return p.peek().Type == t
+}
+
+func (p *Parser) checkPrevious(t token.TokenType) bool {
+	return p.previous().Type == t
 }
 
 func (p *Parser) previous() token.Token {
