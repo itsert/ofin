@@ -23,6 +23,27 @@ func (s *StmtExpression) Accept(visitor StatementVisitor) interface{} {
 }
 
 
+type If struct {
+	Condition Expression
+	ThenBranch Statement
+	ElseBranch Statement
+}
+
+func NewIf(Condition Expression, ThenBranch Statement, ElseBranch Statement) *If{
+	return &If{
+		Condition:	Condition,
+		ThenBranch:	ThenBranch,
+		ElseBranch:	ElseBranch,
+	}
+}
+
+func (i *If) Statement() {}
+
+func (i *If) Accept(visitor StatementVisitor) interface{} {
+	 return visitor.VisitIfStatement(i)
+}
+
+
 type Print struct {
 	Expr Expression
 }
@@ -91,6 +112,23 @@ func (a *And) Accept(visitor StatementVisitor) interface{} {
 }
 
 
+type Scenario struct {
+	Label string
+}
+
+func NewScenario(Label string) *Scenario{
+	return &Scenario{
+		Label:	Label,
+	}
+}
+
+func (s *Scenario) Statement() {}
+
+func (s *Scenario) Accept(visitor StatementVisitor) interface{} {
+	 return visitor.VisitScenarioStatement(s)
+}
+
+
 type Var struct {
 	Name token.Token
 	Initializer Expression
@@ -111,12 +149,12 @@ func (v *Var) Accept(visitor StatementVisitor) interface{} {
 
 
 type Block struct {
-	statements []Statement
+	Statements []Statement
 }
 
-func NewBlock(statements []Statement) *Block{
+func NewBlock(Statements []Statement) *Block{
 	return &Block{
-		statements:	statements,
+		Statements:	Statements,
 	}
 }
 
@@ -127,13 +165,33 @@ func (b *Block) Accept(visitor StatementVisitor) interface{} {
 }
 
 
+type DoNoting struct {
+	Name token.Token
+}
+
+func NewDoNoting(Name token.Token) *DoNoting{
+	return &DoNoting{
+		Name:	Name,
+	}
+}
+
+func (d *DoNoting) Statement() {}
+
+func (d *DoNoting) Accept(visitor StatementVisitor) interface{} {
+	 return visitor.VisitDoNotingStatement(d)
+}
+
+
 type StatementVisitor interface {
 	VisitStmtExpressionStatement(statement *StmtExpression) interface{}
+	VisitIfStatement(statement *If) interface{}
 	VisitPrintStatement(statement *Print) interface{}
 	VisitWhenStatement(statement *When) interface{}
 	VisitThenStatement(statement *Then) interface{}
 	VisitAndStatement(statement *And) interface{}
+	VisitScenarioStatement(statement *Scenario) interface{}
 	VisitVarStatement(statement *Var) interface{}
 	VisitBlockStatement(statement *Block) interface{}
+	VisitDoNotingStatement(statement *DoNoting) interface{}
 }
 

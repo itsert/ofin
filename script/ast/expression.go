@@ -80,6 +80,27 @@ func (l *Literal) Accept(visitor ExpressionVisitor) interface{} {
 }
 
 
+type Logical struct {
+	Left Expression
+	Operator token.Token
+	Right Expression
+}
+
+func NewLogical(Left Expression, Operator token.Token, Right Expression) *Logical{
+	return &Logical{
+		Left:	Left,
+		Operator:	Operator,
+		Right:	Right,
+	}
+}
+
+func (l *Logical) Expression() {}
+
+func (l *Logical) Accept(visitor ExpressionVisitor) interface{} {
+	 return visitor.VisitLogicalExpression(l)
+}
+
+
 type Unary struct {
 	Operator token.Token
 	Right Expression
@@ -121,6 +142,7 @@ type ExpressionVisitor interface {
 	VisitBinaryExpression(expression *Binary) interface{}
 	VisitGroupingExpression(expression *Grouping) interface{}
 	VisitLiteralExpression(expression *Literal) interface{}
+	VisitLogicalExpression(expression *Logical) interface{}
 	VisitUnaryExpression(expression *Unary) interface{}
 	VisitVariableExpression(expression *Variable) interface{}
 }

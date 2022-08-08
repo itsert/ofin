@@ -12,6 +12,7 @@ import (
 type interpreter struct {
 	environment  *environment.Environment
 	programState *environment.ProgramState
+	label        string
 }
 
 func NewInterpreter() *interpreter {
@@ -35,6 +36,10 @@ func (p *interpreter) Interpret(stmts []ast.Statement) {
 
 func (p *interpreter) execute(stmt ast.Statement) {
 	stmt.Accept(p)
+}
+
+func (p *interpreter) VisitLogicalExpression(expression *ast.Logical) interface{} {
+	return nil
 }
 
 func (p *interpreter) VisitBinaryExpression(expr *ast.Binary) interface{} {
@@ -116,17 +121,21 @@ func (p *interpreter) VisitUnaryExpression(expr *ast.Unary) interface{} {
 			merror.RuntimeError(expr.Operator, "Operand must be a numbers")
 		}
 	case token.BANG:
-		switch i := right.(type) {
-		case bool:
-			return bool(i)
-		default:
-			if i == nil {
-				return false
-			}
-		}
-		return true
+		return p.expressBoolean(right)
 	}
 	return nil
+}
+
+func (p *interpreter) expressBoolean(expr interface{}) bool {
+	switch i := expr.(type) {
+	case bool:
+		return bool(i)
+	default:
+		if i == nil {
+			return false
+		}
+	}
+	return true
 }
 
 func (p *interpreter) VisitVariableExpression(expression *ast.Variable) interface{} {
@@ -141,6 +150,15 @@ func (p *interpreter) VisitAssignExpression(expression *ast.Assign) interface{} 
 	value := p.evaluate(expression.Expr)
 	p.environment.Assign(expression.Name, value)
 	return value
+}
+
+func (p *interpreter) VisitIfStatement(statement *ast.If) interface{} {
+	if p.expressBoolean(p.evaluate(statement.Condition)) {
+		p.execute(statement.ThenBranch)
+	} else if statement.ElseBranch != nil {
+		p.execute(statement.ElseBranch)
+	}
+	return nil
 }
 
 func (p *interpreter) VisitStmtExpressionStatement(statement *ast.StmtExpression) interface{} {
@@ -184,7 +202,9 @@ func (p *interpreter) VisitThenStatement(statement *ast.Then) interface{} {
 
 func (p *interpreter) executeThen(statement *ast.Then) {
 	value := p.evaluate(statement.Expr)
+	result := p.expressBoolean(value)
 	fmt.Printf("%+v\n", value)
+	fmt.Printf("%+v\n", result)
 }
 
 func (p *interpreter) VisitAndStatement(statement *ast.And) interface{} {
@@ -192,13 +212,40 @@ func (p *interpreter) VisitAndStatement(statement *ast.And) interface{} {
 		p.executeWhen(&ast.When{Expr: statement.Expr})
 	} else if p.programState.IsState(environment.THEN) {
 		p.executeThen(&ast.Then{Expr: statement.Expr})
+	} else if p.programState.IsState(environment.GIVEN) {
+		var varExpr interface{} = statement.Expr
+		p.VisitAssignExpression(varExpr.(*ast.Assign))
 	} else {
 		fmt.Printf("AND: Program in invalid State:%+v\n", p.programState)
 	}
 	return nil
 }
 
+func (p *interpreter) VisitScenarioStatement(statement *ast.Scenario) interface{} {
+	_, err := p.programState.Transition(environment.SCENARIO)
+	_ = err
+	p.label = statement.Label
+	return nil
+}
+
 func (p *interpreter) VisitBlockStatement(statement *ast.Block) interface{} {
+	p.executeBlock(statement.Statements, environment.NewEnvironmentWithParent(p.environment))
+	return nil
+}
+
+func (p *interpreter) executeBlock(statements []ast.Statement, environment *environment.Environment) {
+	previous := p.environment
+	defer func() {
+		p.environment = previous
+	}()
+	p.environment = environment
+	for _, statement := range statements {
+		p.execute(statement)
+	}
+}
+
+//Convenience function to silently ignore newlines
+func (p *interpreter) VisitDoNotingStatement(statement *ast.DoNoting) interface{} {
 	return nil
 }
 

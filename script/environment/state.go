@@ -43,6 +43,7 @@ func NewState() *ProgramState {
 			{SCENARIO, WHEN}:   transitionFuncImpl,
 			{GIVEN, WHEN}:      transitionFuncImpl,
 			{GIVEN, THEN}:      transitionFuncImpl,
+			{GIVEN, SCENARIO}:  transitionFuncImpl,
 			{WHEN, THEN}:       transitionFuncImpl,
 			{THEN, GLOBAL}:     transitionFuncImpl,
 			{THEN, SCENARIO}:   transitionFuncImpl,

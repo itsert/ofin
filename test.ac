@@ -1,18 +1,9 @@
-//Scenario "In the spirit of a Scenario":
-//    Given a = 31 + 2
-//    And b = "hello"
-//    When "Something happened":
-//        a = 23
-//        print a
-//        b = a
-//        print a
-//    Then "The nothing":
-//        print a
-//        print b
-Scenario:
-   Given a = 31 + 2
-   And b = "hello"
+Scenario "Trying out Action blocks":
+   Given a = 3
+   And b = 3
    When:
-      a = 23
-      print a
-      print 3
+      if a != 3:
+         print "gotcha"
+   Then a == b
+   And a > b
+   print b

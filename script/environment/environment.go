@@ -8,29 +8,45 @@ import (
 )
 
 type Environment struct {
-	Global map[string]interface{}
+	value     map[string]interface{}
+	enclosing *Environment
 }
 
 func NewEnvironment() *Environment {
 	return &Environment{
-		Global: map[string]interface{}{},
+		value:     map[string]interface{}{},
+		enclosing: nil,
+	}
+}
+func NewEnvironmentWithParent(enclosing *Environment) *Environment {
+	return &Environment{
+		value:     map[string]interface{}{},
+		enclosing: enclosing,
 	}
 }
 
 func (e *Environment) Define(name string, value interface{}) {
-	e.Global[name] = value
+	e.value[name] = value
 }
 func (e *Environment) Assign(name token.Token, value interface{}) {
-	if _, ok := e.Global[name.Lexeme]; ok {
-		e.Global[name.Lexeme] = value
-	} else {
-		merror.RuntimeError(name, "Undefined variable '"+name.Lexeme+"'.")
+	if _, ok := e.value[name.Lexeme]; ok {
+		e.value[name.Lexeme] = value
+		return
 	}
+	if e.enclosing != nil {
+		e.enclosing.Assign(name, value)
+		return
+	}
+	merror.RuntimeError(name, "Undefined variable '"+name.Lexeme+"'.")
+
 }
 func (e *Environment) Get(name token.Token) (interface{}, error) {
-	if v, ok := e.Global[name.Lexeme]; ok {
+	if v, ok := e.value[name.Lexeme]; ok {
 		return v, nil
 	}
-	// merror.RuntimeError(name, fmt.Sprintf("Variable %s is undefined.", name.Lexeme))
+
+	if e.enclosing != nil {
+		return e.enclosing.Get(name)
+	}
 	return nil, fmt.Errorf("variable %s is undefined", name.Lexeme)
 }

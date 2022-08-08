@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/itsert/ofin/script/interpreter"
 	"github.com/itsert/ofin/script/lexer"
 	"github.com/itsert/ofin/script/parser"
 	"github.com/itsert/ofin/script/tools"
@@ -21,53 +22,34 @@ func main() {
 			"Binary : Left Expression, Operator token.Token, Right Expression",
 			"Grouping : Expr Expression",
 			"Literal : Value interface{}",
+			"Logical : Left Expression, Operator token.Token, Right Expression",
 			"Unary : Operator token.Token, Right Expression",
 			"Variable : Name token.Token",
 		})
 		tools.GenerateAST(os.Args[2], "Statement", []string{
 			"StmtExpression : Expr Expression",
+			"If : Condition Expression, ThenBranch Statement, ElseBranch Statement",
 			"Print : Expr Expression",
 			"When : Expr Expression",
 			"Then : Expr Expression",
 			"And : Expr Expression",
+			"Scenario : Label string",
 			"Var : Name token.Token, Initializer Expression",
-			"Block : statements []Statement",
+			"Block : Statements []Statement",
+			"DoNoting : Name token.Token",
 		})
 	} else if action == "pretty" {
-		// 		input := `
-		// print 1 + 2 * (3 + 4)
-		// print 4
-		// print true
-		// print 2 + 1
-		// //And 1 + 2
-		// //Given a = 31 + 78
-		// //And b = "hello"
-		// //print b
-		// //a = 23
-		// //print a
-		// //print b
-		// Then 1 + 2
-		// 		`
-		// 		input = `
-		// Scenario:
-		//    Given a = 31 + 2
-		//    And b = "hello"
-		//    When:
-		//       a = 23
-		// 	  print a
-		//       print 3
-		// `
 		dat, err := os.ReadFile("test.ac")
 		_ = err
 		l := lexer.NewLexer(string(dat), "main.go")
+
+		//fmt.Printf("Lexer %+v\n", l.Tokenize())
 
 		stmnts, err := parser.NewParser(l).ParseProgram()
 		if err != nil {
 			return
 		}
-
-		fmt.Printf("Lexer %+v\n", l)
-		// interpreter.NewInterpreter().Interpret(stmnts)
+		interpreter.NewInterpreter().Interpret(stmnts)
 		_ = stmnts
 
 	} else {
