@@ -39,7 +39,18 @@ func (p *interpreter) execute(stmt ast.Statement) {
 }
 
 func (p *interpreter) VisitLogicalExpression(expression *ast.Logical) interface{} {
-	return nil
+	left := p.evaluate(expression.Left)
+
+	if expression.Operator.Type == token.LOGICAL_OR {
+		if p.expressBoolean(left) {
+			return left
+		}
+	} else {
+		if !p.expressBoolean(left) {
+			return left
+		}
+	}
+	return p.evaluate(expression.Right)
 }
 
 func (p *interpreter) VisitBinaryExpression(expr *ast.Binary) interface{} {

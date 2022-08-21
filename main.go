@@ -35,6 +35,7 @@ func main() {
 			"And : Expr Expression",
 			"Scenario : Label string",
 			"Var : Name token.Token, Initializer Expression",
+			"While : Condition Expression, body Statement",
 			"Block : Statements []Statement",
 			"DoNoting : Name token.Token",
 		})

@@ -55,7 +55,8 @@ const (
 	LEFT_BRACE  = "{"
 	RIGHT_BRACE = "}"
 	AND         = "AND"
-	OR          = "OR"
+	LOGICAL_AND = "LOGICAL_AND"
+	LOGICAL_OR  = "LOGICAL_OR"
 	NIL         = "NIL"
 	// Keywords
 	// 1343456
@@ -92,6 +93,8 @@ var keywords = map[string]TokenType{
 	"Story":    STORY,
 	"print":    PRINT,
 	"Scenario": SCENARIO,
+	"and":      LOGICAL_AND,
+	"or":       LOGICAL_OR,
 }
 
 func LookupIdentifier(ident string) TokenType {

@@ -210,7 +210,7 @@ func (s *Lexer) processIndentBlocks() {
 	} else if count < s.indentTokenStack.Peek().(int) {
 		if count != 0 {
 			for count < s.indentTokenStack.Peek().(int) {
-				nextCount := count * (s.indentTokenStack.Size() - 1)
+				nextCount := s.indentTokenLength * (s.indentTokenStack.Size() - 1)
 				if nextCount != s.indentTokenStack.Peek().(int) || s.whiteSpaceType != whiteSpaceType {
 					merror.Error(s.File, s.line, s.start, "inconsistent indentation detected")
 					return

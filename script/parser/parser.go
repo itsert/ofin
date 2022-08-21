@@ -244,7 +244,7 @@ func (p *Parser) expression() ast.Expression {
 }
 
 func (p *Parser) assignment() ast.Expression {
-	expr := p.equality()
+	expr := p.or()
 
 	if p.lookAhead(token.ASSIGN) {
 		equals := p.previous()
@@ -254,6 +254,28 @@ func (p *Parser) assignment() ast.Expression {
 			return ast.NewAssign(name, value)
 		}
 		merror.RuntimeError(equals, "Invalid assignment target")
+	}
+	return expr
+}
+
+func (p *Parser) or() ast.Expression {
+	expr := p.and()
+
+	for p.lookAhead(token.LOGICAL_OR) {
+		operator := p.previous()
+		right := p.and()
+		expr = ast.NewLogical(expr, operator, right)
+	}
+	return expr
+}
+
+func (p *Parser) and() ast.Expression {
+	expr := p.equality()
+
+	for p.lookAhead(token.LOGICAL_AND) {
+		operator := p.previous()
+		right := p.equality()
+		expr = ast.NewLogical(expr, operator, right)
 	}
 	return expr
 }

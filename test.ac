@@ -1,9 +1,11 @@
 Scenario "Trying out Action blocks":
-   Given a = 3
-   And b = 3
-   When:
-      if a != 3:
-         print "gotcha"
-   Then a == b
-   And a > b
-   print b
+    Given a = 3
+    And b = 3
+    When:
+        if a != 3 or b == 3:
+            print "gotcha"
+        else:
+            print 4
+    Then a == b
+    And a > b
+    print b
