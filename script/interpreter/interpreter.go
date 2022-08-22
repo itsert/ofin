@@ -2,6 +2,7 @@ package interpreter
 
 import (
 	"fmt"
+	"github.com/itsert/ofin/script/callable"
 
 	"github.com/itsert/ofin/merror"
 	"github.com/itsert/ofin/script/ast"
@@ -9,20 +10,51 @@ import (
 	"github.com/itsert/ofin/script/token"
 )
 
-type interpreter struct {
+type Interpreter struct {
 	environment  *environment.Environment
+	Global       *environment.Environment
 	programState *environment.ProgramState
 	label        string
 }
 
-func NewInterpreter() *interpreter {
-	return &interpreter{
-		environment:  environment.NewEnvironment(),
+func NewInterpreter() *Interpreter {
+	globals := environment.NewEnvironment()
+	defineNativeFunctions(globals)
+	return &Interpreter{
+		environment:  globals,
+		Global:       globals,
 		programState: environment.NewState(),
 	}
 }
 
-func (p *interpreter) Interpret(stmts []ast.Statement) {
+func defineNativeFunctions(env *environment.Environment) {
+	env.Define("clock", callable.NewClock())
+}
+
+func (p *Interpreter) VisitCallExpression(expression *ast.Call) interface{} {
+	callee := p.evaluate(expression.Callee)
+	var arguments []interface{}
+	for _, expr := range expression.Arguments {
+		arguments = append(arguments, p.evaluate(expr))
+	}
+	switch fn := callee.(type) {
+	case callable.Callable:
+		argList := len(arguments)
+		if argList != fn.Arity() {
+			merror.RuntimeError(
+				expression.Paren,
+				fmt.Sprintf("Expected %d arguments, but got %d. ",
+					fn.Arity(),
+					argList))
+		}
+		return fn.Call(p.Global, arguments)
+	default:
+		merror.RuntimeError(expression.Paren, "Can only call functions.")
+	}
+	return nil
+}
+
+func (p *Interpreter) Interpret(stmts []ast.Statement) {
 	defer func() {
 		if r := recover(); r != nil {
 			// err = errors.New("error  encountered")
@@ -34,11 +66,11 @@ func (p *interpreter) Interpret(stmts []ast.Statement) {
 	}
 }
 
-func (p *interpreter) execute(stmt ast.Statement) {
+func (p *Interpreter) execute(stmt ast.Statement) {
 	stmt.Accept(p)
 }
 
-func (p *interpreter) VisitLogicalExpression(expression *ast.Logical) interface{} {
+func (p *Interpreter) VisitLogicalExpression(expression *ast.Logical) interface{} {
 	left := p.evaluate(expression.Left)
 
 	if expression.Operator.Type == token.LOGICAL_OR {
@@ -53,7 +85,7 @@ func (p *interpreter) VisitLogicalExpression(expression *ast.Logical) interface{
 	return p.evaluate(expression.Right)
 }
 
-func (p *interpreter) VisitBinaryExpression(expr *ast.Binary) interface{} {
+func (p *Interpreter) VisitBinaryExpression(expr *ast.Binary) interface{} {
 	right := p.evaluate(expr.Right)
 	left := p.evaluate(expr.Left)
 	_, ok1 := left.(float64)
@@ -115,13 +147,13 @@ func (p *interpreter) VisitBinaryExpression(expr *ast.Binary) interface{} {
 
 	return nil
 }
-func (p *interpreter) VisitGroupingExpression(expr *ast.Grouping) interface{} {
+func (p *Interpreter) VisitGroupingExpression(expr *ast.Grouping) interface{} {
 	return p.evaluate(expr.Expr)
 }
-func (p *interpreter) VisitLiteralExpression(expr *ast.Literal) interface{} {
+func (p *Interpreter) VisitLiteralExpression(expr *ast.Literal) interface{} {
 	return expr.Value
 }
-func (p *interpreter) VisitUnaryExpression(expr *ast.Unary) interface{} {
+func (p *Interpreter) VisitUnaryExpression(expr *ast.Unary) interface{} {
 	right := p.evaluate(expr.Right)
 	switch expr.Operator.Type {
 	case token.MINUS:
@@ -137,10 +169,10 @@ func (p *interpreter) VisitUnaryExpression(expr *ast.Unary) interface{} {
 	return nil
 }
 
-func (p *interpreter) expressBoolean(expr interface{}) bool {
+func (p *Interpreter) expressBoolean(expr interface{}) bool {
 	switch i := expr.(type) {
 	case bool:
-		return bool(i)
+		return i
 	default:
 		if i == nil {
 			return false
@@ -149,7 +181,7 @@ func (p *interpreter) expressBoolean(expr interface{}) bool {
 	return true
 }
 
-func (p *interpreter) VisitVariableExpression(expression *ast.Variable) interface{} {
+func (p *Interpreter) VisitVariableExpression(expression *ast.Variable) interface{} {
 	v, err := p.environment.Get(expression.Name)
 	if err != nil {
 		merror.RuntimeError(expression.Name, err.Error())
@@ -157,13 +189,13 @@ func (p *interpreter) VisitVariableExpression(expression *ast.Variable) interfac
 	return v
 }
 
-func (p *interpreter) VisitAssignExpression(expression *ast.Assign) interface{} {
+func (p *Interpreter) VisitAssignExpression(expression *ast.Assign) interface{} {
 	value := p.evaluate(expression.Expr)
 	p.environment.Assign(expression.Name, value)
 	return value
 }
 
-func (p *interpreter) VisitIfStatement(statement *ast.If) interface{} {
+func (p *Interpreter) VisitIfStatement(statement *ast.If) interface{} {
 	if p.expressBoolean(p.evaluate(statement.Condition)) {
 		p.execute(statement.ThenBranch)
 	} else if statement.ElseBranch != nil {
@@ -172,17 +204,24 @@ func (p *interpreter) VisitIfStatement(statement *ast.If) interface{} {
 	return nil
 }
 
-func (p *interpreter) VisitStmtExpressionStatement(statement *ast.StmtExpression) interface{} {
+func (p *Interpreter) VisitStmtExpressionStatement(statement *ast.StmtExpression) interface{} {
 	p.evaluate(statement.Expr)
 	return nil
 }
-func (p *interpreter) VisitPrintStatement(statement *ast.Print) interface{} {
+func (p *Interpreter) VisitPrintStatement(statement *ast.Print) interface{} {
 	value := p.evaluate(statement.Expr)
 	fmt.Printf("%+v\n", value)
 	return nil
 }
 
-func (p *interpreter) VisitVarStatement(statement *ast.Var) interface{} {
+func (p *Interpreter) VisitWhileStatement(statement *ast.While) interface{} {
+	for p.expressBoolean(p.evaluate(statement.Condition)) {
+		p.execute(statement.Body)
+	}
+	return nil
+}
+
+func (p *Interpreter) VisitVarStatement(statement *ast.Var) interface{} {
 	var value interface{} = nil
 	if statement.Initializer != nil {
 		value = p.evaluate(statement.Initializer)
@@ -193,38 +232,39 @@ func (p *interpreter) VisitVarStatement(statement *ast.Var) interface{} {
 	return nil
 }
 
-func (p *interpreter) VisitWhenStatement(statement *ast.When) interface{} {
+func (p *Interpreter) VisitWhenStatement(statement *ast.When) interface{} {
 	p.executeWhen(statement)
 	_, err := p.programState.Transition(environment.WHEN)
 	_ = err
 	return nil
 }
 
-func (p *interpreter) executeWhen(statement *ast.When) {
+func (p *Interpreter) executeWhen(statement *ast.When) {
 	value := p.evaluate(statement.Expr)
 	fmt.Printf("%+v\n", value)
 }
-func (p *interpreter) VisitThenStatement(statement *ast.Then) interface{} {
+func (p *Interpreter) VisitThenStatement(statement *ast.Then) interface{} {
 	p.executeThen(statement)
 	_, err := p.programState.Transition(environment.THEN)
 	_ = err
 	return nil
 }
 
-func (p *interpreter) executeThen(statement *ast.Then) {
+func (p *Interpreter) executeThen(statement *ast.Then) {
 	value := p.evaluate(statement.Expr)
 	result := p.expressBoolean(value)
 	fmt.Printf("%+v\n", value)
 	fmt.Printf("%+v\n", result)
 }
 
-func (p *interpreter) VisitAndStatement(statement *ast.And) interface{} {
+func (p *Interpreter) VisitAndStatement(statement *ast.And) interface{} {
 	if p.programState.IsState(environment.WHEN) {
 		p.executeWhen(&ast.When{Expr: statement.Expr})
 	} else if p.programState.IsState(environment.THEN) {
 		p.executeThen(&ast.Then{Expr: statement.Expr})
 	} else if p.programState.IsState(environment.GIVEN) {
 		var varExpr interface{} = statement.Expr
+		fmt.Printf("current state %v\n", p.programState.CurrentState())
 		p.VisitAssignExpression(varExpr.(*ast.Assign))
 	} else {
 		fmt.Printf("AND: Program in invalid State:%+v\n", p.programState)
@@ -232,19 +272,21 @@ func (p *interpreter) VisitAndStatement(statement *ast.And) interface{} {
 	return nil
 }
 
-func (p *interpreter) VisitScenarioStatement(statement *ast.Scenario) interface{} {
+func (p *Interpreter) VisitScenarioStatement(statement *ast.Scenario) interface{} {
 	_, err := p.programState.Transition(environment.SCENARIO)
 	_ = err
 	p.label = statement.Label
 	return nil
 }
 
-func (p *interpreter) VisitBlockStatement(statement *ast.Block) interface{} {
+func (p *Interpreter) VisitBlockStatement(statement *ast.Block) interface{} {
+	_, err := p.programState.Transition(statement.BlockState)
+	_ = err
 	p.executeBlock(statement.Statements, environment.NewEnvironmentWithParent(p.environment))
 	return nil
 }
 
-func (p *interpreter) executeBlock(statements []ast.Statement, environment *environment.Environment) {
+func (p *Interpreter) executeBlock(statements []ast.Statement, environment *environment.Environment) {
 	previous := p.environment
 	defer func() {
 		p.environment = previous
@@ -256,15 +298,15 @@ func (p *interpreter) executeBlock(statements []ast.Statement, environment *envi
 }
 
 //Convenience function to silently ignore newlines
-func (p *interpreter) VisitDoNotingStatement(statement *ast.DoNoting) interface{} {
+func (p *Interpreter) VisitDoNotingStatement(statement *ast.DoNoting) interface{} {
 	return nil
 }
 
-func (p *interpreter) evaluate(expr ast.Expression) interface{} {
+func (p *Interpreter) evaluate(expr ast.Expression) interface{} {
 	return expr.Accept(p)
 }
 
-func (p *interpreter) isEqual(a interface{}, b interface{}) bool {
+func (p *Interpreter) isEqual(a interface{}, b interface{}) bool {
 	if a == nil && b == nil {
 		return true
 	}

@@ -20,6 +20,7 @@ func main() {
 		tools.GenerateAST(os.Args[2], "Expression", []string{
 			"Assign   : Name token.Token, Expr Expression",
 			"Binary : Left Expression, Operator token.Token, Right Expression",
+			"Call : Callee Expression, Paren token.Token, Arguments []Expression",
 			"Grouping : Expr Expression",
 			"Literal : Value interface{}",
 			"Logical : Left Expression, Operator token.Token, Right Expression",
@@ -35,8 +36,8 @@ func main() {
 			"And : Expr Expression",
 			"Scenario : Label string",
 			"Var : Name token.Token, Initializer Expression",
-			"While : Condition Expression, body Statement",
-			"Block : Statements []Statement",
+			"While : Condition Expression, Body Statement",
+			"Block : Statements []Statement, BlockState environment.State",
 			"DoNoting : Name token.Token",
 		})
 	} else if action == "pretty" {

@@ -11,8 +11,10 @@ import (
 	"github.com/itsert/ofin/script/token"
 )
 
-const EOF_NEWLINE_MSG = "Expect NEWLINE or EOF after %s statement"
-const STMT_START_ERROR_MSG = "Expect NEWLINE and Indentation for %s block statement"
+const EofNewlineMsg = "Expect NEWLINE or EOF after %s statement"
+const StmtStartErrorMsg = "Expect NEWLINE and Indentation for %s block statement"
+
+const MaxFunctionArguments = 255
 
 type Parser struct {
 	l            *lexer.Lexer
@@ -87,15 +89,18 @@ func (p *Parser) nonActionStatements() ast.Statement {
 	if p.lookAhead(token.PRINT) {
 		return p.printStatement()
 	}
+	if p.lookAhead(token.WHILE) {
+		return p.whileStatement()
+	}
 	if p.lookAhead(token.INDENT) {
-		return ast.NewBlock(p.block())
+		return ast.NewBlock(p.block(), p.programState.CurrentState())
 	}
 	return p.expressionStatement()
 }
 
 func (p *Parser) consumeBlockStart(name string) {
 	p.consume("Expect colon before start of block", token.COLON)
-	p.consume(fmt.Sprintf(STMT_START_ERROR_MSG, name), token.NEWLINE)
+	p.consume(fmt.Sprintf(StmtStartErrorMsg, name), token.NEWLINE)
 }
 func (p *Parser) ifStatement() ast.Statement {
 	condition := p.expression()
@@ -171,7 +176,7 @@ func (p *Parser) subBlock() []ast.Statement {
 func (p *Parser) printStatement() ast.Statement {
 	value := p.expression()
 	if !p.end() {
-		p.consume(fmt.Sprintf(EOF_NEWLINE_MSG, "Print"), token.NEWLINE)
+		p.consume(fmt.Sprintf(EofNewlineMsg, "Print"), token.NEWLINE)
 	}
 
 	return ast.NewPrint(value)
@@ -183,7 +188,7 @@ func (p *Parser) andStatement() ast.Statement {
 	} else {
 		value := p.expression()
 		if !p.end() {
-			p.consume(fmt.Sprintf(EOF_NEWLINE_MSG, "And"), token.NEWLINE)
+			p.consume(fmt.Sprintf(EofNewlineMsg, "And"), token.NEWLINE)
 		}
 		return ast.NewAnd(value)
 	}
@@ -191,13 +196,13 @@ func (p *Parser) andStatement() ast.Statement {
 func (p *Parser) whenStatement() ast.Statement {
 	p.programState.Transition(environment.WHEN)
 	if p.lookAhead(token.COLON) {
-		p.consume(fmt.Sprintf(STMT_START_ERROR_MSG, "When"), token.NEWLINE)
-		p.consume(fmt.Sprintf(STMT_START_ERROR_MSG, "When"), token.INDENT)
-		return ast.NewBlock(p.subBlock())
+		p.consume(fmt.Sprintf(StmtStartErrorMsg, "When"), token.NEWLINE)
+		p.consume(fmt.Sprintf(StmtStartErrorMsg, "When"), token.INDENT)
+		return ast.NewBlock(p.subBlock(), p.programState.CurrentState())
 	} else {
 		value := p.expression()
 		if !p.end() {
-			p.consume(fmt.Sprintf(EOF_NEWLINE_MSG, "When"), token.NEWLINE)
+			p.consume(fmt.Sprintf(EofNewlineMsg, "When"), token.NEWLINE)
 		}
 		return ast.NewWhen(value)
 	}
@@ -206,13 +211,13 @@ func (p *Parser) whenStatement() ast.Statement {
 func (p *Parser) thenStatement() ast.Statement {
 	p.programState.Transition(environment.THEN)
 	if p.lookAhead(token.COLON) {
-		p.consume(fmt.Sprintf(STMT_START_ERROR_MSG, "Then"), token.NEWLINE)
-		p.consume(fmt.Sprintf(STMT_START_ERROR_MSG, "Then"), token.INDENT)
-		return ast.NewBlock(p.subBlock())
+		p.consume(fmt.Sprintf(StmtStartErrorMsg, "Then"), token.NEWLINE)
+		p.consume(fmt.Sprintf(StmtStartErrorMsg, "Then"), token.INDENT)
+		return ast.NewBlock(p.subBlock(), p.programState.CurrentState())
 	} else {
 		value := p.expression()
 		if !p.end() {
-			p.consume(fmt.Sprintf(EOF_NEWLINE_MSG, "When"), token.NEWLINE)
+			p.consume(fmt.Sprintf(EofNewlineMsg, "When"), token.NEWLINE)
 		}
 		return ast.NewThen(value)
 	}
@@ -227,14 +232,14 @@ func (p *Parser) scenarioStatement() ast.Statement {
 		merror.RuntimeError(p.peek(), "Expected string label")
 	}
 	p.consume("Expect COLON to indicate start of new block", token.COLON)
-	p.consume(fmt.Sprintf(EOF_NEWLINE_MSG, "Scenario"), token.NEWLINE)
+	p.consume(fmt.Sprintf(EofNewlineMsg, "Scenario"), token.NEWLINE)
 	return ast.NewScenario(label)
 }
 
 func (p *Parser) expressionStatement() ast.Statement {
 	value := p.expression()
 	if !p.end() {
-		p.consume(fmt.Sprintf(EOF_NEWLINE_MSG, "Expression"), token.NEWLINE)
+		p.consume(fmt.Sprintf(EofNewlineMsg, "Expression"), token.NEWLINE)
 	}
 	return ast.NewStmtExpression(value)
 }
@@ -331,7 +336,7 @@ func (p *Parser) unary() ast.Expression {
 		right := p.unary()
 		return ast.NewUnary(operator, right)
 	}
-	return p.primary()
+	return p.call()
 }
 
 func (p *Parser) primary() ast.Expression {
@@ -427,4 +432,49 @@ func (p *Parser) advance() token.Token {
 
 func (p *Parser) end() bool {
 	return p.tokens[p.current].Type == token.EOF
+}
+
+func (p *Parser) whileStatement() ast.Statement {
+	condition := p.expression()
+	p.consumeBlockStart("while")
+	var body ast.Statement = nil
+	if p.programState.IsState(environment.GLOBAL) {
+		merror.Error(p.fileName, p.peek().Line, p.peek().Line, "loop not expected in global context")
+	} else if p.programState.IsState(environment.SCENARIO) {
+		body = p.actionStatements()
+	} else {
+		body = p.nonActionStatements()
+	}
+	return ast.NewWhile(condition, body)
+}
+
+func (p *Parser) call() ast.Expression {
+	expression := p.primary()
+
+	for {
+		if p.lookAhead(token.LEFT_PAREN) {
+			expression = p.finishCall(expression)
+		} else {
+			break
+		}
+	}
+	return expression
+}
+
+func (p *Parser) finishCall(callee ast.Expression) ast.Expression {
+	var arguments []ast.Expression
+	if !p.check(token.RIGHT_PAREN) {
+		for {
+			if len(arguments) > MaxFunctionArguments {
+				merror.RuntimeError(p.peek(), fmt.Sprintf("Can't have more than %d arguments.", MaxFunctionArguments))
+			}
+			arguments = append(arguments, p.expression())
+			for !p.lookAhead(token.COMMA) {
+				break
+			}
+		}
+	}
+
+	paren := p.consume("Expected ')' after arguments.", token.RIGHT_PAREN)
+	return ast.NewCall(callee, paren, arguments)
 }

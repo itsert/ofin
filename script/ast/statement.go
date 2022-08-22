@@ -1,6 +1,7 @@
 package ast
 
 import "github.com/itsert/ofin/script/token"
+import "github.com/itsert/ofin/script/environment"
 type Statement interface {
 	Statement()
 	Accept(visitor StatementVisitor) interface{}
@@ -148,13 +149,34 @@ func (v *Var) Accept(visitor StatementVisitor) interface{} {
 }
 
 
-type Block struct {
-	Statements []Statement
+type While struct {
+	Condition Expression
+	Body Statement
 }
 
-func NewBlock(Statements []Statement) *Block{
+func NewWhile(Condition Expression, Body Statement) *While{
+	return &While{
+		Condition:	Condition,
+		Body:	Body,
+	}
+}
+
+func (w *While) Statement() {}
+
+func (w *While) Accept(visitor StatementVisitor) interface{} {
+	 return visitor.VisitWhileStatement(w)
+}
+
+
+type Block struct {
+	Statements []Statement
+	BlockState environment.State
+}
+
+func NewBlock(Statements []Statement, BlockState environment.State) *Block{
 	return &Block{
 		Statements:	Statements,
+		BlockState:	BlockState,
 	}
 }
 
@@ -191,6 +213,7 @@ type StatementVisitor interface {
 	VisitAndStatement(statement *And) interface{}
 	VisitScenarioStatement(statement *Scenario) interface{}
 	VisitVarStatement(statement *Var) interface{}
+	VisitWhileStatement(statement *While) interface{}
 	VisitBlockStatement(statement *Block) interface{}
 	VisitDoNotingStatement(statement *DoNoting) interface{}
 }

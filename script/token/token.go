@@ -57,9 +57,10 @@ const (
 	AND         = "AND"
 	LOGICAL_AND = "LOGICAL_AND"
 	LOGICAL_OR  = "LOGICAL_OR"
+	IN          = "IN"
 	NIL         = "NIL"
+
 	// Keywords
-	// 1343456
 	FUNCTION = "FUNCTION"
 	TRUE     = "TRUE"
 	FALSE    = "FALSE"
@@ -95,6 +96,9 @@ var keywords = map[string]TokenType{
 	"Scenario": SCENARIO,
 	"and":      LOGICAL_AND,
 	"or":       LOGICAL_OR,
+	"while":    WHILE,
+	"for":      FOR,
+	"in":       IN,
 }
 
 func LookupIdentifier(ident string) TokenType {

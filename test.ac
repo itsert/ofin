@@ -6,6 +6,9 @@ Scenario "Trying out Action blocks":
             print "gotcha"
         else:
             print 4
-    Then a == b
+    Then:
+        while a < 4:
+            print "less"
+            a = a + 1
     And a > b
-    print b
+    print clock()

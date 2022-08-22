@@ -26,6 +26,7 @@ func GenerateAST(outputDir string, fileName string, types []string) {
 
 	f.WriteString(fmt.Sprintf("package %s\n\n", packageName))
 	f.WriteString("import \"github.com/itsert/ofin/script/token\"\n")
+	f.WriteString("import \"github.com/itsert/ofin/script/environment\"\n")
 	baseType := fileName
 	f.WriteString(fmt.Sprintf("type %s interface {\n", baseType))
 	f.WriteString(fmt.Sprintf("\t%s()\n", baseType))
